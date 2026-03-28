@@ -96,7 +96,7 @@ This project uses **two VMs** connected via an **isolated internal network**:
 | Machine | OS | Interface | IP Address |
 |--------|----|-----------|------------|
 | Honeypot VM | Kali Linux | `eth1` | `192.168.100.10/24` |
-| Attacker VM | Kali Linux | `eth1` | `192.168.100.20/24` |
+| Attacker VM | Kali Linux | `eth0` | `192.168.100.20/24` |
 
 Cowrie listens on SSH port **2222** (honeypot port), so the attacker connects using:
 ```bash
@@ -126,8 +126,8 @@ sudo ip link set eth1 up
 
 **On Attacker VM**
 ```bash
-sudo ip addr add 192.168.100.20/24 dev eth1
-sudo ip link set eth1 up
+sudo ip addr add 192.168.100.20/24 dev eth0
+sudo ip link set eth0 up
 ```
 
 (Optional) Verify connectivity (from attacker to honeypot):
