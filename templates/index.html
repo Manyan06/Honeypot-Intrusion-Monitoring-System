@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="refresh" content="10">
+  <title>Honeypot IMS — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- Scan-line overlay -->
+<div class="scanlines"></div>
+
+<!-- Particle canvas (matrix rain) -->
+<canvas id="matrix"></canvas>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="header-left">
+    <div class="logo">
+      <span class="logo-icon">⬡</span>
+      <div>
+        <div class="logo-title">HONEYPOT <span class="accent">IMS</span></div>
+        <div class="logo-sub">Intrusion Monitoring System</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    {% if using_mock %}
+    <div class="badge badge-mock">⚠ DEMO MODE — Mock Data</div>
+    {% else %}
+    <div class="badge badge-live">● LIVE</div>
+    {% endif %}
+    <div class="clock" id="clock">{{ now }}</div>
+    <div class="refresh-note">Auto-refresh: 10s</div>
+  </div>
+</header>
+
+<!-- ═══════════════ STAT CARDS ═══════════════ -->
+<section class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">📡</div>
+    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-label">Total Events</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🌐</div>
+    <div class="stat-value">{{ stats.unique_ips }}</div>
+    <div class="stat-label">Unique IPs</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-icon">🚫</div>
+    <div class="stat-value">{{ stats.login_fails }}</div>
+    <div class="stat-label">Failed Logins</div>
+  </div>
+  <div class="stat-card warn">
+    <div class="stat-icon">🔓</div>
+    <div class="stat-value">{{ stats.login_ok }}</div>
+    <div class="stat-label">Successful Logins</div>
+  </div>
+  <div class="stat-card cmd">
+    <div class="stat-icon">💻</div>
+    <div class="stat-value">{{ stats.commands }}</div>
+    <div class="stat-label">Commands Run</div>
+  </div>
+</section>
+
+<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+<main class="content-grid">
+
+  <!-- LOG TABLE -->
+  <section class="panel log-panel">
+    <div class="panel-header">
+      <span class="panel-title">▶ Recent Intrusion Events</span>
+      <span class="panel-count">{{ logs|length }} entries</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Event Type</th>
+            <th>Source IP</th>
+            <th>Detail</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr class="
+            {% if 'failed' in log.get('eventid','') %}row-fail
+            {% elif 'success' in log.get('eventid','') %}row-success
+            {% elif 'command' in log.get('eventid','') %}row-cmd
+            {% else %}row-info{% endif %}
+          ">
+            <td class="row-num">{{ loop.index }}</td>
+            <td>
+              {% if 'failed' in log.get('eventid','') %}
+                <span class="badge badge-fail">⛔ Login Failed</span>
+              {% elif 'success' in log.get('eventid','') %}
+                <span class="badge badge-success">🔓 Login Success</span>
+              {% elif 'command' in log.get('eventid','') %}
+                <span class="badge badge-cmd">⌨ Command</span>
+              {% else %}
+                <span class="badge badge-info">ℹ {{ log.get('eventid','—') }}</span>
+              {% endif %}
+            </td>
+            <td class="ip-cell">{{ log.get('src_ip', '—') }}</td>
+            <td class="detail-cell">
+              {% if log.get('input') %}
+                <code>{{ log.get('input') }}</code>
+              {% elif log.get('username') %}
+                <span class="cred">{{ log.get('username') }}</span>
+                {% if log.get('password') %} / <span class="cred-pass">{{ log.get('password') }}</span>{% endif %}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td class="ts-cell">{{ log.get('timestamp','—')[:19].replace('T',' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Top Attackers -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🔥 Top Attacker IPs</span>
+      </div>
+      <ul class="ip-list">
+        {% for item in stats.top_ips %}
+        <li>
+          <span class="ip-addr">{{ item.ip }}</span>
+          <div class="ip-bar-wrap">
+            <div class="ip-bar" style="width: {{ [item.count * 10, 100]|min }}%"></div>
+          </div>
+          <span class="ip-count">{{ item.count }}</span>
+        </li>
+        {% endfor %}
+        {% if not stats.top_ips %}
+        <li class="muted">No data yet</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <!-- Event Breakdown -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">📊 Event Breakdown</span>
+      </div>
+      <div class="breakdown">
+        <div class="breakdown-row">
+          <span class="bl fail-col">Failed Logins</span>
+          <span class="bv">{{ stats.login_fails }}</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="bl ok-col">Successful Logins</span>
+          <span class="bv">{{ stats.login_ok }}</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="bl cmd-col">Commands Executed</span>
+          <span class="bv">{{ stats.commands }}</span>
+        </div>
+      </div>
+
+      <!-- Simple bar chart -->
+      <div class="bar-chart">
+        {% set total = stats.login_fails + stats.login_ok + stats.commands %}
+        {% if total > 0 %}
+        <div class="bar-seg fail-bg"  style="flex: {{ stats.login_fails }}" title="Failed Logins"></div>
+        <div class="bar-seg ok-bg"    style="flex: {{ stats.login_ok }}"    title="Successful Logins"></div>
+        <div class="bar-seg cmd-bg"   style="flex: {{ stats.commands }}"    title="Commands"></div>
+        {% else %}
+        <div class="bar-seg muted-bg" style="flex:1"></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- System Info -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⚙ System Info</span>
+      </div>
+      <div class="sysinfo">
+        <div class="si-row"><span>Honeypot</span><span class="green">Cowrie SSH</span></div>
+        <div class="si-row"><span>Listen Port</span><span>2222</span></div>
+        <div class="si-row"><span>Honeypot IP</span><span>192.168.100.10</span></div>
+        <div class="si-row"><span>Log Source</span>
+          <span class="{% if using_mock %}warn-col{% else %}green{% endif %}">
+            {% if using_mock %}Mock Data{% else %}cowrie.json{% endif %}
+          </span>
+        </div>
+        <div class="si-row"><span>Dashboard</span><span>Flask 3.x</span></div>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<footer>
+  <span>Honeypot Intrusion Monitoring System &nbsp;|&nbsp; Cowrie SSH + Flask</span>
+  <span>For authorized, controlled lab use only.</span>
+</footer>
+
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
