@@ -26,34 +26,34 @@ The project simulates a **Security Operations Center (SOC)** workflow in a contr
 
 ---
 
-##Core Features
+## Core Features
 
 **Deception Layer**
--Fake SSH server using Cowrie
--Emulated Debian/Linux shell
--Isolated honeynet deployment
--Safe interaction environment for attackers
----
+- Fake SSH server using Cowrie
+- Emulated Debian/Linux shell
+- Isolated honeynet deployment
+- Safe interaction environment for attackers
+
 **Attack Intelligence Engine**
--MITRE ATT&CK TTP mapping
--Behavioral profiling engine
--Semantic threat intent tagging
--Attack chain reconstruction
--SOC-style threat risk scoring
----
+- MITRE ATT&CK TTP mapping
+- Behavioral profiling engine
+- Semantic threat intent tagging
+- Attack chain reconstruction
+- SOC-style threat risk scoring
+
 **Monitoring & Visualization**
--Real-time Flask dashboard
--GeoIP attack source mapping
--Live session monitoring
--Credential analytics
--Threat distribution metrics
--Interactive session timelines
----
+- Real-time Flask dashboard
+- GeoIP attack source mapping
+- Live session monitoring
+- Credential analytics
+- Threat distribution metrics
+- Interactive session timelines
+
 **Forensic Evidence Collection**
--Structured JSON event logging
--Session TTY recordings
--Command history capture
--Authentication event monitoring
+- Structured JSON event logging
+- Session TTY recordings
+- Command history capture
+- Authentication event monitoring
 ---
 
 ## Lab Architecture
@@ -270,7 +270,9 @@ Cowrie successfully captured these actions for forensic analysis.
 ---
 
 **Example Threat Analysis**
+
 **Sample Session**
+
 Event	Detection
 | Event | Detection |
 |---|---|
