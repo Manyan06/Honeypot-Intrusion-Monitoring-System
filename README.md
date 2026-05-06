@@ -303,7 +303,7 @@ Screenshots are available in [`screenshots/`](./screenshots):
 - `04_intrusion_logs.png`
 - `05_Alert_detected.png`
 - `06_Dashboard.png`
-- `07_live_attack_flow.png
+- `07_live_attack_flow.png`
 
 ---
 
