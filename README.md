@@ -26,27 +26,30 @@ The project simulates a **Security Operations Center (SOC)** workflow in a contr
 
 ---
 
-**Core Features**
+##Core Features
 
-*Deception Layer*
+**Deception Layer**
 -Fake SSH server using Cowrie
 -Emulated Debian/Linux shell
 -Isolated honeynet deployment
 -Safe interaction environment for attackers
-*Attack Intelligence Engine*
+---
+**Attack Intelligence Engine**
 -MITRE ATT&CK TTP mapping
 -Behavioral profiling engine
 -Semantic threat intent tagging
 -Attack chain reconstruction
 -SOC-style threat risk scoring
-*Monitoring & Visualization*
+---
+**Monitoring & Visualization**
 -Real-time Flask dashboard
 -GeoIP attack source mapping
 -Live session monitoring
 -Credential analytics
 -Threat distribution metrics
 -Interactive session timelines
-*Forensic Evidence Collection*
+---
+**Forensic Evidence Collection**
 -Structured JSON event logging
 -Session TTY recordings
 -Command history capture
@@ -281,6 +284,7 @@ Event	Detection
 
 **Intelligence Output**
 | Behavioral Profile | Malware Operator |
+|---|---|
 | Risk Score | 82/100 |
 | Severity | Critical |
 | ATT&CK Techniques | T1082, T1105, T1087 |
@@ -297,6 +301,7 @@ Screenshots are available in [`screenshots/`](./screenshots):
 - `04_intrusion_logs.png`
 - `05_Alert_detected.png`
 - `06_Dashboard.png`
+- `07_live_attack_flow.png
 
 ---
 
