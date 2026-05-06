@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Honeypot Intrusion Monitoring System</title>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#0d1117; color:#e6edf3; min-height:100vh; }
+
+/* ── HEADER ── */
+header {
+  background:linear-gradient(135deg,#161b22 0%,#1c2128 100%);
+  padding:16px 28px; border-bottom:1px solid #30363d;
+  display:flex; align-items:center; justify-content:space-between;
+}
+header .left   { display:flex; align-items:center; gap:12px; }
+header h1      { font-size:20px; color:#58a6ff; font-weight:700; }
+header .subtitle { font-size:12px; color:#8b949e; margin-top:2px; }
+.live-badge    { background:#238636; color:#fff; padding:3px 10px; border-radius:12px;
+                 font-size:11px; font-weight:700; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* ── STAT CARDS ── */
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; padding:20px 28px; }
+.stat-card { background:#161b22; border:1px solid #30363d; border-radius:10px;
+             padding:20px; text-align:center; transition:border-color .2s; }
+.stat-card:hover { border-color:#58a6ff; }
+.stat-num   { font-size:38px; font-weight:700; }
+.stat-label { font-size:12px; color:#8b949e; margin-top:6px; text-transform:uppercase; letter-spacing:.5px; }
+
+/* ── SECTION HEADER ── */
+.section-header { padding:16px 28px 0; border-top:1px solid #21262d; margin-top:8px;
+                  display:flex; align-items:center; gap:8px; }
+.section-header h2 { font-size:15px; color:#f0f6fc; font-weight:600; }
+
+/* ── MAP ── */
+#map { height:360px; margin:14px 28px; border-radius:10px; border:1px solid #30363d; }
+
+/* ── RISK DISTRIBUTION ── */
+.risk-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:14px 28px; }
+.risk-card { border-radius:8px; padding:14px; text-align:center; border:1px solid #30363d; }
+.risk-card .rnum   { font-size:30px; font-weight:700; }
+.risk-card .rlabel { font-size:11px; margin-top:4px; font-weight:600; }
+.rc-danger   { background:#2d1117; border-color:#da3633; }
+.rc-danger   .rnum { color:#da3633; }
+.rc-warning  { background:#2d1f0a; border-color:#e3b341; }
+.rc-warning  .rnum { color:#e3b341; }
+.rc-info     { background:#0c1e35; border-color:#58a6ff; }
+.rc-info     .rnum { color:#58a6ff; }
+.rc-success  { background:#0c1f14; border-color:#3fb950; }
+.rc-success  .rnum { color:#3fb950; }
+
+/* ── MITRE CARDS ── */
+.mitre-grid { display:flex; flex-wrap:wrap; gap:10px; padding:14px 28px; }
+.mitre-card { background:#161b22; border:1px solid #30363d; border-radius:6px;
+              padding:10px 14px; min-width:200px; flex:1; }
+.mitre-id     { color:#58a6ff; font-size:12px; font-weight:700; font-family:monospace; }
+.mitre-name   { font-size:13px; color:#e6edf3; margin:3px 0 2px; }
+.mitre-tactic { font-size:11px; color:#8b949e; }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x:auto; margin:14px 28px; border-radius:10px; border:1px solid #30363d; }
+table  { width:100%; border-collapse:collapse; font-size:13px; }
+thead  { background:#161b22; position:sticky; top:0; }
+th     { padding:11px 14px; text-align:left; color:#8b949e; font-weight:600;
+         border-bottom:1px solid #30363d; white-space:nowrap; }
+td     { padding:10px 14px; border-bottom:1px solid #21262d; vertical-align:top; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:#161b22; }
+
+/* ── BADGES ── */
+.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+.badge-danger    { background:#da3633; color:#fff; }
+.badge-warning   { background:#9e6a03; color:#f0e68c; }
+.badge-info      { background:#1f6feb; color:#fff; }
+.badge-success   { background:#238636; color:#fff; }
+.badge-secondary { background:#30363d; color:#ccc; }
+
+/* ── RISK BADGE ── */
+.risk-badge { display:inline-flex; align-items:center; gap:4px;
+              padding:3px 10px; border-radius:12px; font-size:12px; font-weight:700; }
+
+/* ── COMMANDS ── */
+.cmd-list { max-height:80px; overflow-y:auto; }
+.cmd      { background:#0d1117; border-radius:4px; padding:2px 6px;
+            font-family:monospace; font-size:11px; color:#79c0ff;
+            display:inline-block; margin:1px; }
+
+/* ── MITRE TAGS ── */
+.mitre-inline { display:flex; flex-wrap:wrap; gap:3px; }
+.m-tag { background:#0d419d; color:#a5d6ff; border-radius:4px;
+         padding:1px 6px; font-size:10px; font-family:monospace; }
+
+/* ── THREAT TAGS ── */
+.threat-tags { display:flex; flex-direction:column; gap:3px; min-width:180px; }
+.t-tag { font-size:11px; padding:2px 6px; border-radius:4px; }
+.t-danger  { background:#3d0c0c; color:#ff7b7b; border:1px solid #da3633; }
+.t-warning { background:#2d1f0a; color:#ffd700; border:1px solid #9e6a03; }
+.t-info    { background:#0c1e35; color:#79c0ff; border:1px solid #1f6feb; }
+
+/* ── CHAIN BADGE ── */
+.chain-badge { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;
+               display:inline-block; margin-bottom:4px; }
+
+/* ── ATTACK CHAIN FLOW ── */
+.chain-flow { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.flow-step  { background:#161b22; border:1px solid #30363d; border-radius:4px;
+              padding:2px 8px; font-size:10px; color:#8b949e; }
+.flow-arrow { color:#484f58; font-size:10px; align-self:center; }
+
+/* ── TIMELINE ── */
+.timeline { max-height:120px; overflow-y:auto; }
+.tl-row   { display:flex; gap:8px; padding:2px 0; font-size:11px; }
+.tl-time  { color:#8b949e; font-family:monospace; min-width:60px; }
+.tl-event { color:#e6edf3; }
+
+/* ── CREDS ── */
+.creds-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:14px 28px 28px; }
+.cred-card  { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; }
+.cred-card h3 { font-size:13px; color:#8b949e; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; }
+.cred-row   { display:flex; justify-content:space-between; align-items:center;
+              padding:5px 0; border-bottom:1px solid #21262d; font-size:13px; }
+.cred-row:last-child { border:none; }
+.cred-count { color:#58a6ff; font-weight:700; }
+.cred-bar   { height:3px; background:#58a6ff; border-radius:2px; margin-top:3px; }
+
+/* ── CHAIN SUMMARY ── */
+.chain-summary { padding:14px 28px; }
+.chain-item    { background:#161b22; border:1px solid #30363d; border-radius:8px;
+                 padding:12px 16px; margin-bottom:10px;
+                 display:flex; justify-content:space-between; align-items:center; }
+.chain-name    { font-weight:600; font-size:14px; }
+.chain-count   { color:#58a6ff; font-weight:700; font-size:20px; }
+
+footer { text-align:center; padding:20px 28px; color:#484f58; font-size:12px;
+         border-top:1px solid #21262d; margin-top:16px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="left">
+    <span style="font-size:24px">🍯</span>
+    <div>
+      <h1>Honeypot Intrusion Monitoring System</h1>
+      <div class="subtitle">Cowrie SSH · MITRE ATT&CK · Attack Chain · Risk Scoring · GeoIP</div>
+    </div>
+  </div>
+  <span class="live-badge">● LIVE</span>
+</header>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num" id="s-sessions" style="color:#58a6ff">—</div>
+    <div class="stat-label">Total Sessions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="s-success" style="color:#da3633">—</div>
+    <div class="stat-label">Successful Logins</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="s-commands" style="color:#e3b341">—</div>
+    <div class="stat-label">Commands Captured</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="s-ips" style="color:#3fb950">—</div>
+    <div class="stat-label">Unique Source IPs</div>
+  </div>
+</div>
+
+<!-- RISK DISTRIBUTION -->
+<div class="section-header"><h2>⚠️ Risk Level Distribution</h2></div>
+<div class="risk-grid">
+  <div class="risk-card rc-danger">
+    <div class="rnum" id="r-critical">—</div>
+    <div class="rlabel" style="color:#da3633">🔴 CRITICAL</div>
+  </div>
+  <div class="risk-card rc-warning">
+    <div class="rnum" id="r-high">—</div>
+    <div class="rlabel" style="color:#e3b341">🟠 HIGH</div>
+  </div>
+  <div class="risk-card rc-info">
+    <div class="rnum" id="r-medium">—</div>
+    <div class="rlabel" style="color:#58a6ff">🟡 MEDIUM</div>
+  </div>
+  <div class="risk-card rc-success">
+    <div class="rnum" id="r-low">—</div>
+    <div class="rlabel" style="color:#3fb950">🟢 LOW</div>
+  </div>
+</div>
+
+<!-- GEO MAP -->
+<div class="section-header"><h2>🌍 GeoIP Attack Origin Map</h2></div>
+<div id="map"></div>
+
+<!-- MITRE TECHNIQUES -->
+<div class="section-header"><h2>🛡️ MITRE ATT&CK Techniques Detected</h2></div>
+<div class="mitre-grid" id="mitre-grid">
+  <p style="padding:14px;color:#8b949e">Loading techniques...</p>
+</div>
+
+<!-- ATTACK CHAIN SUMMARY -->
+<div class="section-header"><h2>⛓️ Attack Chain Summary</h2></div>
+<div class="chain-summary" id="chain-summary">
+  <p style="color:#8b949e">Loading chains...</p>
+</div>
+
+<!-- SESSIONS TABLE -->
+<div class="section-header"><h2>📋 Session Analysis — Full Intelligence View</h2></div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Session</th>
+        <th>Source IP</th>
+        <th>Time</th>
+        <th>Risk Score</th>
+        <th>Profile</th>
+        <th>Attack Chain</th>
+        <th>Threat Tags</th>
+        <th>Commands</th>
+        <th>MITRE TTPs</th>
+        <th>Session Timeline</th>
+        <th>GeoLocation</th>
+      </tr>
+    </thead>
+    <tbody id="session-body">
+      <tr><td colspan="11" style="color:#8b949e;text-align:center;padding:24px">Loading sessions...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TOP CREDENTIALS -->
+<div class="section-header"><h2>🔑 Top Attempted Credentials</h2></div>
+<div class="creds-grid">
+  <div class="cred-card">
+    <h3>Top Usernames Tried</h3>
+    <div id="top-users"><p style="color:#8b949e;font-size:13px">No data yet</p></div>
+  </div>
+  <div class="cred-card">
+    <h3>Top Passwords Tried</h3>
+    <div id="top-pass"><p style="color:#8b949e;font-size:13px">No data yet</p></div>
+  </div>
+</div>
+
+<footer>
+  Honeypot Intrusion Monitoring System · Cowrie SSH + Flask · MITRE ATT&CK + Risk Scoring + Attack Chain Detection + GeoIP<br>
+  For Educational & Research Use Only
+</footer>
+
+<script>
+// ── MAP INIT ──
+const map = L.map('map').setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© OpenStreetMap contributors', maxZoom:18
+}).addTo(map);
+
+// ── BADGE COLORS ──
+const riskColors = {
+  CRITICAL:{ bg:'#3d0c0c', color:'#ff7b7b', border:'#da3633' },
+  HIGH:    { bg:'#2d1f0a', color:'#ffd700', border:'#9e6a03' },
+  MEDIUM:  { bg:'#0c1e35', color:'#79c0ff', border:'#1f6feb' },
+  LOW:     { bg:'#0c1f14', color:'#7ee787', border:'#238636' }
+};
+
+function riskBadge(risk){
+  const c = riskColors[risk.level] || riskColors.LOW;
+  return `<span class="risk-badge" style="background:${c.bg};color:${c.color};border:1px solid ${c.border}">
+    ${risk.icon} ${risk.level} · ${risk.score}
+  </span>`;
+}
+
+// ── LOAD STATS ──
+fetch('/api/stats').then(r=>r.json()).then(d=>{
+  document.getElementById('s-sessions').textContent = d.total_sessions;
+  document.getElementById('s-success').textContent  = d.successful_logins;
+  document.getElementById('s-commands').textContent = d.total_commands;
+  document.getElementById('s-ips').textContent      = d.unique_ips;
+
+  const rd = d.risk_distribution || {};
+  document.getElementById('r-critical').textContent = rd.CRITICAL || 0;
+  document.getElementById('r-high').textContent     = rd.HIGH     || 0;
+  document.getElementById('r-medium').textContent   = rd.MEDIUM   || 0;
+  document.getElementById('r-low').textContent      = rd.LOW      || 0;
+
+  // Top credentials
+  const uf = document.getElementById('top-users');
+  const pf = document.getElementById('top-pass');
+  uf.innerHTML = '';
+  pf.innerHTML = '';
+  const maxU = d.top_usernames.length ? d.top_usernames[0].count : 1;
+  const maxP = d.top_passwords.length ? d.top_passwords[0].count : 1;
+  d.top_usernames.forEach(u=>{
+    const pct = Math.round((u.count/maxU)*100);
+    uf.innerHTML += `<div class="cred-row"><span>${u.name}</span><span class="cred-count">${u.count}</span></div>
+                     <div class="cred-bar" style="width:${pct}%"></div>`;
+  });
+  d.top_passwords.forEach(p=>{
+    const pct = Math.round((p.count/maxP)*100);
+    pf.innerHTML += `<div class="cred-row"><span>${p.name}</span><span class="cred-count">${p.count}</span></div>
+                     <div class="cred-bar" style="width:${pct}%"></div>`;
+  });
+  if(!d.top_usernames.length) uf.innerHTML = '<p style="color:#8b949e;font-size:13px">No login attempts yet</p>';
+  if(!d.top_passwords.length) pf.innerHTML = '<p style="color:#8b949e;font-size:13px">No login attempts yet</p>';
+
+  // Chain summary
+  const cs = document.getElementById('chain-summary');
+  cs.innerHTML = '';
+  if(d.top_chains && d.top_chains.length){
+    d.top_chains.forEach(([name, count])=>{
+      cs.innerHTML += `
+        <div class="chain-item">
+          <div class="chain-name">⛓️ ${name}</div>
+          <div class="chain-count">${count} session${count>1?'s':''}</div>
+        </div>`;
+    });
+  } else {
+    cs.innerHTML = '<p style="color:#8b949e">No attack chains detected yet</p>';
+  }
+});
+
+// ── LOAD GEO MAP ──
+fetch('/api/geomap').then(r=>r.json()).then(points=>{
+  const countMap = {};
+  points.forEach(p=>{
+    const key = `${p.lat},${p.lon}`;
+    if(!countMap[key]) countMap[key] = {...p, count:0};
+    countMap[key].count++;
+  });
+  Object.values(countMap).forEach(p=>{
+    if(p.lat===0 && p.lon===0) return;
+    L.circleMarker([p.lat, p.lon],{
+      radius: Math.min(6 + p.count*3, 24),
+      color:'#da3633', fillColor:'#da3633', fillOpacity:0.75, weight:2
+    }).bindPopup(
+      `<b style="color:#da3633">${p.ip}</b><br>
+       📍 ${p.city}, ${p.country}<br>
+       🏢 ISP: ${p.isp}<br>
+       🔢 Sessions: ${p.count}`
+    ).addTo(map);
+  });
+});
+
+// ── LOAD SESSIONS ──
+fetch('/api/sessions').then(r=>r.json()).then(sessions=>{
+
+  // ── MITRE GLOBAL AGGREGATE ──
+  const allMitre = {};
+  sessions.forEach(s => s.mitre.forEach(t=>{ allMitre[t.id] = t; }));
+  const mg = document.getElementById('mitre-grid');
+  mg.innerHTML = '';
+  if(!Object.keys(allMitre).length){
+    mg.innerHTML = '<p style="color:#8b949e;padding:14px">No commands captured yet — run an attack simulation</p>';
+  } else {
+    const tacticColors = {
+      'Discovery':'#0d419d','Credential Access':'#6e1e1e',
+      'Execution':'#1f4f1f','Persistence':'#4a2c00',
+      'Privilege Escalation':'#3d0c4f','Defense Evasion':'#0c3030',
+      'Command and Control':'#4a0000','Lateral Movement':'#1c3a1c'
+    };
+    Object.values(allMitre).forEach(t=>{
+      const bg = tacticColors[t.tactic] || '#161b22';
+      mg.innerHTML += `
+        <div class="mitre-card" style="background:${bg}20;border-color:${bg}80">
+          <div class="mitre-id">${t.id}</div>
+          <div class="mitre-name">${t.name}</div>
+          <div class="mitre-tactic">📌 ${t.tactic}</div>
+        </div>`;
+    });
+  }
+
+  // ── SESSION TABLE ──
+  const tbody = document.getElementById('session-body');
+  tbody.innerHTML = '';
+  if(!sessions.length){
+    tbody.innerHTML = '<tr><td colspan="11" style="color:#8b949e;text-align:center;padding:24px">No sessions yet — run the attacker VM</td></tr>';
+    return;
+  }
+
+  sessions.forEach(s=>{
+    // Commands cell
+    const cmds_html = s.commands.length
+      ? `<div class="cmd-list">${s.commands.map(c=>`<span class="cmd">${escHtml(c)}</span>`).join('')}</div>`
+      : '<span style="color:#8b949e">—</span>';
+
+    // MITRE tags
+    const mitre_html = s.mitre.length
+      ? `<div class="mitre-inline">${s.mitre.map(t=>`<span class="m-tag" title="${t.name}">${t.id}</span>`).join('')}</div>`
+      : '<span style="color:#8b949e">—</span>';
+
+    // Threat tags
+    const tags_html = s.tags.length
+      ? `<div class="threat-tags">${s.tags.map(t=>
+          `<span class="t-tag t-${t.color}">${t.tag}</span>`
+        ).join('')}</div>`
+      : '<span style="color:#8b949e">None</span>';
+
+    // Attack chain
+    const chain     = s.chain;
+    const chain_html = `
+      <span class="chain-badge badge-${chain.color}" style="font-size:11px">${chain.name}</span>
+      <div style="font-size:10px;color:#8b949e;margin-top:3px">${chain.description}</div>
+      <div class="chain-flow" style="margin-top:4px">
+        ${chain.tactic_flow.map((t,i)=>
+          `<span class="flow-step">${t}</span>${i<chain.tactic_flow.length-1?'<span class="flow-arrow">→</span>':''}`
+        ).join('')}
+      </div>`;
+
+    // Timeline
+    const tl_html = s.timeline.length
+      ? `<div class="timeline">${s.timeline.map(t=>
+          `<div class="tl-row">
+            <span class="tl-time">${t.time}</span>
+            <span class="tl-event">${escHtml(t.event)}</span>
+          </div>`
+        ).join('')}</div>`
+      : '<span style="color:#8b949e">No events</span>';
+
+    // Geo
+    const geo_html = `
+      <b>${s.geo.city}</b><br>
+      ${s.geo.country} ${s.geo.countryCode !== 'LO' ? `(${s.geo.countryCode})` : ''}<br>
+      <small style="color:#8b949e">${s.geo.isp}</small>`;
+
+    // Login badge
+    const login_badge = s.login_success
+      ? '<span class="badge badge-danger">✓ Success</span>'
+      : '<span class="badge badge-secondary">✗ Failed</span>';
+
+    tbody.innerHTML += `
+      <tr>
+        <td><code style="font-size:11px;color:#58a6ff">${s.session}</code></td>
+        <td>
+          <code style="color:#79c0ff">${s.src_ip}</code><br>
+          <small style="color:#8b949e">${login_badge}</small>
+        </td>
+        <td style="white-space:nowrap;font-size:12px">${s.start_time}</td>
+        <td>
+          ${riskBadge(s.risk)}
+          <div style="font-size:10px;color:#8b949e;margin-top:4px">
+            ${s.risk.reasons.slice(0,2).map(r=>`• ${r}`).join('<br>')}
+          </div>
+        </td>
+        <td>
+          <span class="badge badge-${s.profile.badge}">${s.profile.type}</span>
+          <div style="font-size:10px;color:#8b949e;margin-top:4px">${s.profile.description}</div>
+        </td>
+        <td>${chain_html}</td>
+        <td>${tags_html}</td>
+        <td>${cmds_html}</td>
+        <td>${mitre_html}</td>
+        <td>${tl_html}</td>
+        <td>${geo_html}</td>
+      </tr>`;
+  });
+});
+
+function escHtml(str){
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
