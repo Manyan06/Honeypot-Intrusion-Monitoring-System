@@ -17,7 +17,11 @@ The system transforms raw honeypot logs into actionable behavioral intelligence 
 > This environment is intended for **education, security research, and controlled lab use** only.
 
 ---
+## Live_demo - 
 
+https://github.com/user-attachments/assets/b0e4390d-ed35-43ad-8aa6-7aaf68e21b28
+
+---
 ## Project Objective
 
 Traditional honeypots mainly collect logs and provide passive monitoring. **HoneyShield** extends this concept by introducing an intelligence-driven analysis layer capable of identifying attacker intent, profiling behavior patterns, reconstructing intrusion chains and prioritizing threats in real time.
@@ -303,7 +307,6 @@ Screenshots are available in [`screenshots/`](./screenshots):
 - `04_intrusion_logs.png`
 - `05_Alert_detected.png`
 - `06_Dashboard.png`
-- `07_live_attack_flow.png`
 
 ---
 
